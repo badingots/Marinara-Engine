@@ -9,6 +9,10 @@ export interface LorebookReaderEntry {
   lorebookName: string;
   /** Off when the entry, its chat override, or its lorebook's chat exclusion turns it off. */
   enabled: boolean;
+  /** The entry's name (or first key) with macros replaced; empty for an untitled entry. */
+  name: string;
+  /** The entry's content with macros replaced. */
+  content: string;
 }
 
 export interface LorebookReaderView {
@@ -28,7 +32,8 @@ export function toggleLorebookReaderPin(pins: string[], entryId: string): string
 
 /**
  * Every entry of the chat's lorebooks, disabled ones included: pinned entries first (in pin order),
- * then the rest grouped by lorebook. A query keeps entries whose name or content contains it.
+ * then the rest grouped by lorebook. Names and content have macros replaced, and a query keeps entries
+ * whose replaced name or content contains it, so search matches what the Reader shows.
  */
 export function buildLorebookReaderView({
   lorebooks,
@@ -36,12 +41,14 @@ export function buildLorebookReaderView({
   pins,
   entryStateOverrides,
   query,
+  resolveMacros = (text) => text,
 }: {
   lorebooks: ActiveLorebookView[];
   entries: LorebookEntry[];
   pins: string[];
   entryStateOverrides?: Record<string, { enabled?: boolean }> | null;
   query: string;
+  resolveMacros?: (text: string) => string;
 }): LorebookReaderView {
   const needle = query.trim().toLocaleLowerCase();
   const pinOrder = new Map(pins.map((id, index) => [id, index]));
@@ -52,11 +59,15 @@ export function buildLorebookReaderView({
   for (const entry of entries) {
     const lorebook = lorebookById.get(entry.lorebookId);
     if (!lorebook) continue;
-    if (needle && !`${entry.name}\n${entry.content}`.toLocaleLowerCase().includes(needle)) continue;
+    const name = resolveMacros(entry.name.trim() || entry.keys[0] || "").trim();
+    const content = resolveMacros(entry.content).trim();
+    if (needle && !`${name}\n${content}`.toLocaleLowerCase().includes(needle)) continue;
     const readerEntry: LorebookReaderEntry = {
       entry,
       lorebookName: lorebook.name,
       enabled: (entryStateOverrides?.[entry.id]?.enabled ?? entry.enabled) && !lorebook.isExcluded,
+      name,
+      content,
     };
     if (pinOrder.has(entry.id)) {
       pinned.push(readerEntry);

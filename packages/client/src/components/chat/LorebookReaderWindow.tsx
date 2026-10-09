@@ -119,10 +119,16 @@ function LorebookReaderContent({
 
   // ponytail: display-only macros reuse the chat input's resolver, so chat variables ({{getvar}}) and
   // lorebook-only macros stay unresolved. Upgrade path: a server route using buildPromptMacroContext.
-  const resolveMacros = useMemo(
-    () => createInputMacroResolverForChat(chat, characters as Array<{ id: string; data: unknown }>, personas),
-    [chat, characters, personas],
-  );
+  const resolveMacros = useMemo(() => {
+    const resolve = createInputMacroResolverForChat(chat, characters as Array<{ id: string; data: unknown }>, personas);
+    // Search rebuilds the view on every keystroke; replace each text once per chat context.
+    const resolved = new Map<string, string>();
+    return (text: string) => {
+      let value = resolved.get(text);
+      if (value === undefined) resolved.set(text, (value = resolve(text)));
+      return value;
+    };
+  }, [chat, characters, personas]);
   const view = useMemo(
     () =>
       buildLorebookReaderView({
@@ -131,8 +137,9 @@ function LorebookReaderContent({
         pins,
         entryStateOverrides: chatMeta.entryStateOverrides,
         query,
+        resolveMacros,
       }),
-    [lorebooks, entries, pins, chatMeta.entryStateOverrides, query],
+    [lorebooks, entries, pins, chatMeta.entryStateOverrides, query, resolveMacros],
   );
   // The search cannot change while an entry is open, so the open entry is always in the view;
   // one deleted meanwhile falls back to the list.
@@ -162,7 +169,6 @@ function LorebookReaderContent({
       <LorebookReaderDetail
         item={selected}
         pinned={pins.includes(selected.entry.id)}
-        resolveMacros={resolveMacros}
         onBack={() => setSelectedEntryId(null)}
         onTogglePin={() => togglePin(selected.entry.id)}
       />
@@ -244,7 +250,7 @@ const READER_ICON_BUTTON =
   "flex h-8 w-8 shrink-0 items-center justify-center rounded text-[var(--muted-foreground)] transition-colors hover:bg-[var(--accent)] hover:text-[var(--foreground)]";
 
 function readerEntryName(item: LorebookReaderEntry, untitled: string) {
-  return item.entry.name.trim() || item.entry.keys[0] || untitled;
+  return item.name || untitled;
 }
 
 function OffBadge() {
@@ -293,13 +299,11 @@ function LorebookReaderListRow({
 function LorebookReaderDetail({
   item,
   pinned,
-  resolveMacros,
   onBack,
   onTogglePin,
 }: {
   item: LorebookReaderEntry;
   pinned: boolean;
-  resolveMacros: (template: string) => string;
   onBack: () => void;
   onTogglePin: () => void;
 }) {
@@ -307,10 +311,11 @@ function LorebookReaderDetail({
   const backRef = useRef<HTMLButtonElement>(null);
   const { entry } = item;
   const name = readerEntryName(item, t("chat.lorebookReader.untitled"));
-  const renderedContent = useMemo(() => {
-    const content = resolveMacros(entry.content).trim();
-    return content ? renderMarkdownBlocks(content, applyInlineMarkdown, `lorebook-reader-${entry.id}`) : null;
-  }, [resolveMacros, entry.content, entry.id]);
+  const renderedContent = useMemo(
+    () =>
+      item.content ? renderMarkdownBlocks(item.content, applyInlineMarkdown, `lorebook-reader-${entry.id}`) : null,
+    [item.content, entry.id],
+  );
   useEffect(() => backRef.current?.focus(), []);
 
   return (

@@ -72,6 +72,36 @@ assert.deepEqual(
   "search matches entry names",
 );
 
+const resolveMacros = (text: string) => text.replaceAll("{{user}}", "Jem").replaceAll("{{char}}", "Mira");
+const macroEntries = [
+  entry("loft", "persona", "{{user}}'s Loft Apartment", "Shared with {{char}}."),
+  { ...entry("keyed", "persona", "  ", "No name."), keys: ["{{char}}'s diary"] } as LorebookEntry,
+  entry("blank", "persona", "", "No name or keys."),
+];
+const resolvedItems = buildLorebookReaderView({
+  lorebooks,
+  entries: macroEntries,
+  pins: [],
+  query: "",
+  resolveMacros,
+}).groups.flatMap((group) => group.entries);
+assert.deepEqual(
+  resolvedItems.map((item) => [item.name, item.content]),
+  [
+    ["Jem's Loft Apartment", "Shared with Mira."],
+    ["Mira's diary", "No name."],
+    ["", "No name or keys."],
+  ],
+  "names (or a nameless entry's first key) and content show with macros replaced",
+);
+const searchResolved = (query: string) =>
+  buildLorebookReaderView({ lorebooks, entries: macroEntries, pins: [], query, resolveMacros }).groups.flatMap(
+    (group) => group.entries.map((item) => item.entry.id),
+  );
+assert.deepEqual(searchResolved("jem's loft"), ["loft"], "search matches the name as shown");
+assert.deepEqual(searchResolved("with mira"), ["loft"], "search matches the content as shown");
+assert.deepEqual(searchResolved("{{user}}"), [], "search does not match macros the Reader no longer shows");
+
 assert.deepEqual(toggleLorebookReaderPin(["a"], "b"), ["a", "b"], "pinning appends");
 assert.deepEqual(toggleLorebookReaderPin(["a", "b"], "a"), ["b"], "pinning again unpins");
 assert.deepEqual(readLorebookReaderPins(["a", 1, null, "b"]), ["a", "b"], "stored pins keep only ids");
