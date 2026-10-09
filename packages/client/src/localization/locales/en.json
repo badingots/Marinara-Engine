@@ -515,6 +515,7 @@
   "chat.kaomoji.empty": "No kaomoji found.",
   "chat.kaomoji.search": "Search kaomoji…",
   "chat.kaomoji.title": "Kaomoji picker",
+  "chat.lorebookReader.back": "Back to entries",
   "chat.lorebookReader.empty": "This chat's lorebooks have no entries yet.",
   "chat.lorebookReader.emptyEntry": "This entry has no content.",
   "chat.lorebookReader.loadError": "Couldn't load the lorebook entries.",
