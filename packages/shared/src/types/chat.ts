@@ -179,6 +179,16 @@ export interface ChatSummaryPromptTemplate {
 }
 
 /** Server app-setting key for Roleplay Chat Summary prompt templates shared across all roleplays. */
+/**
+ * Metadata keys that only change how the chat is viewed (window places, dismissed tips, Lorebook Reader
+ * pins). A patch of nothing but these is not chat activity, so it leaves the chat's updatedAt alone.
+ */
+export const VIEW_ONLY_CHAT_METADATA_KEYS: readonly string[] = [
+  "windowLayout",
+  "chatSettingsHintDismissed",
+  "lorebookPinnedEntryIds",
+];
+
 export const CHAT_SUMMARY_PROMPT_SETTINGS_KEY = "chat-summary-prompts";
 
 /** Global Roleplay Chat Summary prompt template settings. */
@@ -282,6 +292,8 @@ export interface ChatMetadata {
   windowLayout?: unknown;
   /** Hide Chat Settings' introductory tips for this chat; included in settings profiles. */
   chatSettingsHintDismissed?: boolean;
+  /** Lorebook Reader entries pinned in this chat, in pin order. */
+  lorebookPinnedEntryIds?: string[];
   /** Chat-local tracker icon overrides keyed by persona id, unique character id, or tracker character slot. */
   trackerStatIconOverrides?: Record<string, import("../constants/stat-icons.js").TrackerStatIconAssignment[]>;
   /** Compiled enabled rolling summary text for context injection. Derived from summaryEntries when present. */

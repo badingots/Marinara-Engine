@@ -27,7 +27,7 @@ import { isMessageHidden } from "../lib/message-visibility";
 import { copyLocalSpriteVisualSettings } from "../components/chat/local-sprite-visual-settings";
 import { lorebookKeys } from "./use-lorebooks";
 import { achievementKeys, trackAchievementEvent } from "./use-achievements";
-import { normalizeAdvancedMemorySettings } from "@marinara-engine/shared";
+import { normalizeAdvancedMemorySettings, VIEW_ONLY_CHAT_METADATA_KEYS } from "@marinara-engine/shared";
 import type {
   AdvancedMemoryStatus,
   Chat,
@@ -949,9 +949,7 @@ export function useUpdateChatMetadata(options?: { serialize?: boolean }) {
         );
       }
       const changedKeys = Object.keys(metadata);
-      const viewOnly =
-        changedKeys.length > 0 &&
-        changedKeys.every((key) => key === "windowLayout" || key === "chatSettingsHintDismissed");
+      const viewOnly = changedKeys.length > 0 && changedKeys.every((key) => VIEW_ONLY_CHAT_METADATA_KEYS.includes(key));
       const version = nextChatMetadataMutationVersion(id, changedKeys);
       if (base) {
         syncCachedChat(qc, {
@@ -1026,7 +1024,8 @@ export function useUpdateChatMetadata(options?: { serialize?: boolean }) {
       }
       qc.invalidateQueries({ queryKey: chatKeys.list() });
       qc.invalidateQueries({ queryKey: [...chatKeys.all, "group"] });
-      qc.invalidateQueries({ queryKey: lorebookKeys.active(vars.id) });
+      // View-only keys cannot change which entries activate, so they skip the lorebook re-scan.
+      if (!context?.viewOnly) qc.invalidateQueries({ queryKey: lorebookKeys.active(vars.id) });
       if (Object.hasOwn(vars, "enableMemoryRecall") || Object.hasOwn(vars, "advancedMemory")) {
         qc.invalidateQueries({ queryKey: ["advanced-memory", vars.id] });
       }

@@ -39,6 +39,7 @@ const TRACKER_CLEARANCE_VARIABLE = "--tracker-panel-overlay-clearance";
 /** Each control window's id; Game's ids are only used in Game chats. */
 export const CHAT_CONTROL_WINDOW_IDS = {
   connectedChat: "control:connected-chat",
+  lorebookReader: "control:lorebook-reader",
   beholder: (packageId: string) => `control:beholder:${packageId}`,
   gameControls: "control:game",
   session: "control:session",

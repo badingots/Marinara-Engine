@@ -321,6 +321,14 @@ function selectEnabledConversationPackages(installed: InstalledCapabilityPackage
   });
 }
 
+/** The chat's enabled packages that add a conversation toolbar. */
+export function useConversationToolbarPackages(chatMeta: Record<string, any>) {
+  const { data: installedCapabilities = [] } = useInstalledCapabilityPackages();
+  return selectEnabledConversationPackages(installedCapabilities, chatMeta).filter((item) =>
+    item.manifest.contributions?.slots?.includes("conversation-toolbar"),
+  );
+}
+
 /** Package toolbars (the conversation-toolbar slot) as control windows that minimize to bubbles. */
 export function ConversationPackageWindows({
   chatId,
@@ -335,10 +343,7 @@ export function ConversationPackageWindows({
   chatCharIds: string[];
   personaInfo?: PersonaInfo;
 }) {
-  const { data: installedCapabilities = [] } = useInstalledCapabilityPackages();
-  const packages = selectEnabledConversationPackages(installedCapabilities, chatMeta).filter((item) =>
-    item.manifest.contributions?.slots?.includes("conversation-toolbar"),
-  );
+  const packages = useConversationToolbarPackages(chatMeta);
   const capabilityProps = {
     chatId,
     metadata: chatMeta,

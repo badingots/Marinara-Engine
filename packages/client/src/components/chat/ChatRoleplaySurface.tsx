@@ -71,6 +71,7 @@ import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 import { CyoaChoices } from "./CyoaChoices";
 import { CHAT_CONTROL_WINDOW_IDS, ChatConnectedChatWindow, ChatControlWindow } from "./ChatControlWindow";
+import { LorebookReaderWindow, useLorebookReaderLorebooks } from "./LorebookReaderWindow";
 import { TrackerPanelBubble } from "./TrackerPanelBubble";
 import { PHONE_BUBBLE_SIZE_PX, WINDOW_BUBBLE_SIZE_PX, WINDOW_MARGIN_PX } from "../../lib/floating-window-layout";
 import { useMatchMedia } from "../../hooks/use-match-media";
@@ -971,6 +972,8 @@ export function ChatRoleplaySurface({
     trackerPanelOpen &&
     (chatMeta.enableAgents === true || chatMeta.advancedMemory?.enabled === true);
   const phoneSlotOffset = phoneLayout && showTrackerPanelBubble ? 1 : 0;
+  const readerLorebooks = useLorebookReaderLorebooks(chat);
+  const readerSlotCount = readerLorebooks.length > 0 ? 1 : 0;
   useRenderTimer("rp-surface"); // [#3104 diagnostic]
   const isMobileToolbarViewport = useIsMobileToolbarViewport();
   const streamedMessageId = useChatStore((s) => s.streamedMessageIds.get(activeChatId) ?? null);
@@ -2229,13 +2232,23 @@ export function ChatRoleplaySurface({
           phoneSlot={phoneSlotOffset}
         />
       )}
+      {/* After the connected chat (slot 0) and the package toolbars; Beholder follows it. */}
+      {chat && (
+        <LorebookReaderWindow
+          chat={chat}
+          chatMeta={chatMeta}
+          lorebooks={readerLorebooks}
+          slot={conversationToolbarPackages.length + 1}
+          phoneSlot={phoneSlotOffset + conversationToolbarPackages.length + 1}
+        />
+      )}
 
       {/* Outside the isolated chat area, so it stacks with Chat Settings and the other chat windows. */}
       {chat && chatMeta.enableAgents && (
         <Suspense fallback={null}>
           <RoleplayTrackerWindow
-            beholderSlot={conversationToolbarPackages.length + 1}
-            beholderPhoneSlot={phoneSlotOffset + conversationToolbarPackages.length + 1}
+            beholderSlot={conversationToolbarPackages.length + readerSlotCount + 1}
+            beholderPhoneSlot={phoneSlotOffset + conversationToolbarPackages.length + readerSlotCount + 1}
             chatId={chat.id}
             enabledAgentTypes={enabledAgentTypes}
             isStreaming={isStreaming}

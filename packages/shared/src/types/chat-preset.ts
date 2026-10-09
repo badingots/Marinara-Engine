@@ -88,6 +88,7 @@ export const CHAT_PRESET_EXCLUDED_METADATA_KEYS: readonly string[] = [
   "sceneBusyCharIds",
   // Lorebooks are owned by the chat, never by the profile.
   "activeLorebookIds",
+  "lorebookPinnedEntryIds",
   // Hierarchical Maps definitions and per-chat editing choices stay with the chat.
   "spatialContext",
   "spatialContextHierarchyProfile",
