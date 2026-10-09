@@ -6,7 +6,17 @@
 // Pinned entries stay open at the top; pins are saved with the chat.
 // ──────────────────────────────────────────────
 import { useMemo, useState } from "react";
-import { BookOpen, ChevronDown, ChevronRight, ExternalLink, Loader2, Pin, PinOff, Search } from "lucide-react";
+import {
+  BookMarked,
+  BookOpen,
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
+  Loader2,
+  Pin,
+  PinOff,
+  Search,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Chat, Lorebook } from "@marinara-engine/shared";
 import { useCharacters, usePersonas } from "../../hooks/use-characters";
@@ -69,7 +79,7 @@ export function LorebookReaderWindow({
     <ChatControlWindow
       id={CHAT_CONTROL_WINDOW_IDS.lorebookReader}
       title={t("chat.lorebookReader.title")}
-      icon={<BookOpen size={14} />}
+      icon={<BookMarked size={14} />}
       slot={slot}
       phoneSlot={phoneSlot}
       width={340}
