@@ -29,6 +29,7 @@ import {
   type ActiveLorebookView,
 } from "../../lib/chat-lorebooks";
 import { createInputMacroResolverForChat } from "../../lib/chat-macros";
+import { applyInlineMarkdown, renderMarkdownBlocks } from "../../lib/markdown";
 import {
   LOREBOOK_READER_PINS_KEY,
   buildLorebookReaderView,
@@ -194,6 +195,13 @@ function LorebookReaderContent({
   );
 }
 
+/**
+ * The shared chat-message heading sizes (h1 is 1.5rem) dwarf the Reader's 0.75rem text, and their image cap
+ * (28rem) is wider than the window. `!` is needed to beat the more specific `.mari-message-content` rules.
+ */
+const READER_MARKDOWN_SIZES =
+  "[&_.mari-md-heading]:!text-[0.8125rem] [&_h1.mari-md-heading]:!text-[0.9375rem] [&_h2.mari-md-heading]:!text-[0.875rem] [&_img]:!max-w-full";
+
 function LorebookReaderEntryRow({
   item,
   pinned,
@@ -211,6 +219,10 @@ function LorebookReaderEntryRow({
   const { entry, enabled } = item;
   const name = entry.name.trim() || entry.keys[0] || t("chat.lorebookReader.untitled");
   const content = expanded ? resolveMacros(entry.content).trim() : "";
+  const renderedContent = useMemo(
+    () => (content ? renderMarkdownBlocks(content, applyInlineMarkdown, `lorebook-reader-${entry.id}`) : null),
+    [content, entry.id],
+  );
   const actionClassName =
     "flex h-7 w-7 shrink-0 items-center justify-center rounded text-[var(--muted-foreground)] transition-colors hover:bg-[var(--accent)] hover:text-[var(--foreground)]";
 
@@ -261,9 +273,16 @@ function LorebookReaderEntryRow({
         </button>
       </div>
       {expanded && (
-        <p className="select-text whitespace-pre-wrap break-words border-t border-[var(--border)] px-2.5 py-2 text-[0.75rem] leading-relaxed text-[var(--foreground)]">
-          {content || <span className="text-[var(--muted-foreground)]">{t("chat.lorebookReader.emptyEntry")}</span>}
-        </p>
+        <div
+          className={cn(
+            "mari-message-content select-text whitespace-pre-wrap break-words border-t border-[var(--border)] px-2.5 py-2 text-[0.75rem] leading-relaxed",
+            READER_MARKDOWN_SIZES,
+          )}
+        >
+          {renderedContent ?? (
+            <span className="text-[var(--muted-foreground)]">{t("chat.lorebookReader.emptyEntry")}</span>
+          )}
+        </div>
       )}
     </div>
   );
