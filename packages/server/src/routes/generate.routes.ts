@@ -51,7 +51,9 @@ import {
 import { registerSequentialGameTasks } from "../services/game/sequential-tasks.js";
 import {
   createAdvancedMemoryService,
+  sceneCheckTranscript,
   selectAdvancedMemoryMessages,
+  selectAdvancedMemoryWhisperOnlyIds,
   type AdvancedMemorySceneCheck,
 } from "../services/advanced-memory.js";
 import {
@@ -135,6 +137,7 @@ import {
   estimateTextTokens,
   diffChatVariables,
   mergeChatVariableChanges,
+  removeCopiedPromptGuidance,
   undoChatVariableChanges,
   type APIProvider,
   type MacroContext,
@@ -221,6 +224,7 @@ import {
   parseRoleplayUserCommands,
   roleplayCommandKey,
   roleplayHiddenWhisperMessageIds,
+  latestRoleplayUserInput,
   resolveRoleplayWhisperRecipient,
   RoleplayCommandStreamFilter,
   type RoleplayCommand,
@@ -538,6 +542,7 @@ import {
   buildAvailableSpriteCharacter,
   completeRequiredSpriteExpressionEntries,
   normalizeRequiredSpriteExpressionIds,
+  playerTurnAwaitsExpression,
   normalizeSpriteDisplayModes,
   validateSpriteExpressionEntries,
 } from "./generate/expression-agent-utils.js";
@@ -2184,7 +2189,9 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
       const currentInputMessages = (): SimpleMessage[] =>
         regenerateUserSourceMessage ? [...mappedMessages, regenerateUserSourceMessage] : mappedMessages;
       const currentUserInputContent = (): string | undefined =>
-        [...currentInputMessages()].reverse().find((message) => message.role === "user")?.content;
+        chatMode === "roleplay"
+          ? latestRoleplayUserInput(currentInputMessages(), chatMessages)
+          : [...currentInputMessages()].reverse().find((message) => message.role === "user")?.content;
 
       const identity =
         roomHostIdentity() ??
@@ -2777,11 +2784,19 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
               ).map((message) => message.id),
             )
           : null;
+        const advancedAgentWhisperOnlyIds = advancedMemoryEnabled
+          ? selectAdvancedMemoryWhisperOnlyIds(
+              advancedSourceMessages,
+              advancedMemorySettings,
+              promptCharacterIds,
+              promptGroupChatMode === "individual",
+            )
+          : undefined;
         const sharedPromptForAgents = (messages: GenerationPromptMessage[]) =>
           advancedAgentSourceIds
             ? filterPromptHistoryByMessageIds(
                 resolveAdvancedMemoryPrompt(messages, advancedMemoryPlacements, {}),
-                advancedAgentSourceIds,
+                new Set([...advancedAgentSourceIds, ...advancedAgentWhisperOnlyIds!]),
                 new Set(advancedSourceMessages.map((message) => message.id)),
               )
             : messages;
@@ -7508,7 +7523,11 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
             !input.impersonate &&
             (await resolveSceneBusyCharacterIds(chats, input.chatId)).includes(targetCharId)
           ) {
-            sendSseEvent(reply, { type: "offline", characters: [groupResponderName(targetCharId)] });
+            sendSseEvent(reply, {
+              type: "offline",
+              reason: "scene_busy",
+              characters: [groupResponderName(targetCharId)],
+            });
             return null;
           }
           generationProviderOrigin = { model: conn.model, provider: conn.provider };
@@ -7994,6 +8013,7 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
             agentContext.memory._mainPromptPreview = promptPreviewForAgents(publicRoleplayPrompt ?? messages);
           };
           let effectiveMaxTokensForSend: number | undefined = maxTokens;
+          let lastContextFit: ReturnType<typeof fitMessagesForModelAccess>["contextFit"] | undefined;
           const fitPromptForSend = async (candidateMessages: ChatMessage[]): Promise<ChatMessage[]> => {
             if (advancedMemoryEnabled) {
               if (advancedMemoryReceipt)
@@ -8020,6 +8040,7 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
             });
             finalPromptSent = fit.messages;
             effectiveMaxTokensForSend = fit.maxTokensForSend;
+            lastContextFit = fit.contextFit;
             return fit.messages;
           };
 
@@ -8939,7 +8960,22 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
             if (blockedSpeakers.length) {
               fullResponse = "";
               if (!holdForTextRewrite) sendSseEvent(reply, { type: "content_replace", data: "" });
-              sendSseEvent(reply, { type: "offline", characters: [...new Set(blockedSpeakers)] });
+              const sceneBusyIds = new Set(await resolveSceneBusyCharacterIds(chats, input.chatId));
+              const sceneBusyNames = new Set(
+                charInfo.filter((character) => sceneBusyIds.has(character.id)).flatMap(speakerNames),
+              );
+              const offlineSpeakerNames = new Set(
+                charInfo
+                  .filter((character) => !isAvailableGroupResponder(character.id) && !sceneBusyIds.has(character.id))
+                  .flatMap(speakerNames),
+              );
+              const names = [...new Set(blockedSpeakers)];
+              const sceneNames = names.filter((name) => sceneBusyNames.has(normalizeTextForMatch(name)));
+              const offlineNames = names.filter((name) => offlineSpeakerNames.has(normalizeTextForMatch(name)));
+              if (sceneNames.length) {
+                sendSseEvent(reply, { type: "offline", reason: "scene_busy", characters: sceneNames });
+              }
+              if (offlineNames.length) sendSseEvent(reply, { type: "offline", characters: offlineNames });
               return null;
             }
           }
@@ -10318,6 +10354,7 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
                 durationMs,
                 reasoningDurationMs,
                 finishReason: finishReason ?? null,
+                contextFit: lastContextFit ?? null,
               },
             };
             if (fullThinking) extraUpdate.thinking = fullThinking;
@@ -11382,7 +11419,8 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
                 pendingSceneCheck = request;
                 agentContext.sceneCheck = {
                   trackerAgentIds: sceneCheckTrackers.map((agent) => agent.id),
-                  prompt: `${request.prompt}\nTranscript:\n${JSON.stringify(request.messages)}`,
+                  // The previous message joins only when this tracker could already see it.
+                  prompt: `${request.prompt}\nTranscript:\n${sceneCheckTranscript(request, !!request.previous && allowedIds.has(request.previous.messageId))}`,
                   claimed: false,
                 };
               }
@@ -11400,8 +11438,16 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
               },
             ]);
           }
+          // The persona needs an expression on the turn the player wrote, including its swipes and
+          // continuations. Later replies leave it to the Expression Engine, so a persona who has left the scene
+          // is not shown again by "Only show active sprites" while an older message of theirs is in context.
+          const replyIndex = allChatMessages.findIndex(
+            (message) => message.id === (input.regenerateMessageId ?? input.continueMessageId),
+          );
           if (
             userIdentityId &&
+            (currentTurnUserMessageId ||
+              playerTurnAwaitsExpression(allChatMessages, replyIndex >= 0 ? replyIndex : allChatMessages.length)) &&
             getLatestUserExpressionSource() &&
             Array.isArray(agentContext.memory._availableSprites)
           ) {
@@ -13215,8 +13261,19 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
                       const imgWidth = illustrationSize.width;
                       const imgHeight = illustrationSize.height;
 
+                      // The writer follows the Style text and the connection's instructions; a sentence
+                      // of them it copied word for word is not image-model text (#7357).
+                      const writerGuidance = [
+                        typeof agentContext.memory._illustratorImageStyleInstruction === "string"
+                          ? agentContext.memory._illustratorImageStyleInstruction
+                          : null,
+                        imgConnFull.imagePromptInstructions,
+                      ];
+                      // A style that was only the copied Style text is dropped; the prompt keeps the subject.
+                      const writerStyle = removeCopiedPromptGuidance(style, writerGuidance, { allowEmpty: true });
+                      const writerPrompt = removeCopiedPromptGuidance(imagePrompt, writerGuidance);
                       // Prepend style to the prompt for better results
-                      let fullPrompt = style ? `${style}, ${imagePrompt}` : imagePrompt;
+                      let fullPrompt = writerStyle ? `${writerStyle}, ${writerPrompt}` : writerPrompt;
                       if (imagePositivePrompt) {
                         fullPrompt = `${fullPrompt}, ${imagePositivePrompt}`;
                       }
@@ -13369,7 +13426,7 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
                         styleProfiles: imageSettings.styleProfiles,
                         styleProfileId,
                         imageDefaults,
-                        generatedStyle: style,
+                        generatedStyle: writerStyle,
                         omitProfileStyleText: typeof agentContext.memory._illustratorImageStyleInstruction === "string",
                         omitProfileSubjectTags: illustratorPromptTemplateOwnsComposition(
                           imagePromptAgent?.promptTemplate ?? "",
@@ -13389,7 +13446,7 @@ export async function generateRoutes(app: FastifyInstance, options: GenerateRout
                             styleProfiles: imageSettings.styleProfiles,
                             styleProfileId,
                             imageDefaults: imageFallback.imageDefaults,
-                            generatedStyle: style,
+                            generatedStyle: writerStyle,
                             omitProfileStyleText:
                               typeof agentContext.memory._illustratorImageStyleInstruction === "string",
                             omitProfileSubjectTags: illustratorPromptTemplateOwnsComposition(

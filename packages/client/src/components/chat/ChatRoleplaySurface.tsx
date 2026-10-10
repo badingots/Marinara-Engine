@@ -760,6 +760,13 @@ type RoleplaySurfaceProps = {
   onDelete: (messageId: string) => void;
   onRegenerate: (messageId: string) => void;
   onEdit: (messageId: string, content: string) => void | Promise<void>;
+  /** N1: the user message whose reply failed, if any — drives the "Failed · Retry" line. */
+  failedReplyMessageId?: string | null;
+  failedReplyReason?: string;
+  onRetryFailedReply?: () => void;
+  /** R2: the reply that gets the checkup's quiet line, and the line itself. */
+  replyCheckupMessageId?: string | null;
+  replyCheckup?: ReactNode;
   onSetActiveSwipe: (messageId: string, index: number) => void;
   onToggleConversationStart: (
     messageId: string,
@@ -877,6 +884,11 @@ export function ChatRoleplaySurface({
   onDelete,
   onRegenerate,
   onEdit,
+  failedReplyMessageId,
+  failedReplyReason,
+  onRetryFailedReply,
+  replyCheckupMessageId,
+  replyCheckup,
   onSetActiveSwipe,
   onToggleConversationStart,
   onToggleHiddenFromAI,
@@ -1955,6 +1967,10 @@ export function ChatRoleplaySurface({
                           onDelete={onDelete}
                           onRegenerate={onRegenerate}
                           onEdit={onEdit}
+                          failedReply={msg.id === failedReplyMessageId}
+                          failedReplyReason={failedReplyReason}
+                          onRetryFailedReply={onRetryFailedReply}
+                          replyCheckup={msg.id === replyCheckupMessageId ? replyCheckup : undefined}
                           onSetActiveSwipe={onSetActiveSwipe}
                           onToggleConversationStart={onToggleConversationStart}
                           onToggleHiddenFromAI={onToggleHiddenFromAI}
@@ -2091,6 +2107,10 @@ export function ChatRoleplaySurface({
                               key={`${activeChatId}:${activeVnMessage.id}:${activeVnMessage.activeSwipeIndex}`}
                               message={activeVnMessage}
                               memoryStartCharacterIds={memoryContextStarts.get(activeVnMessage.id)}
+                              failedReply={activeVnMessage.id === failedReplyMessageId}
+                              failedReplyReason={failedReplyReason}
+                              onRetryFailedReply={onRetryFailedReply}
+                              replyCheckup={activeVnMessage.id === replyCheckupMessageId ? replyCheckup : undefined}
                               visualNovel
                               visualNovelSpeech={vnSpeech}
                               onVisualNovelSpeechParagraph={setVnParagraphIndex}
