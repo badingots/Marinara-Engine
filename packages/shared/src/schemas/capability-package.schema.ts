@@ -555,7 +555,13 @@ const capabilityPackageManifestBaseSchema = z
 //        context, holds the lock while the scene runs and receives the recap when it ends. The browser
 //        view gets `startScene`, `openChat`, `focusSceneOriginId` and `onFocusSceneOriginHandled`. Requires
 //        the `scenes` permission.
-export const supportedCapabilityApi = Object.freeze({ major: 1, minor: 66 } as const);
+// 1.67: the browser view gets `openCharacter(characterId, { tab })`, which opens the character editor,
+//        on that tab when given. Soft seam: a package checks that the function exists, so it does not
+//        need to declare 1.67. No permission.
+// 1.68: `embeddings.embed(texts, signal, inputType)` takes `"query"` or `"document"` (the default), so a
+//        model with query and document prefixes embeds a search query as a query. Soft seam: an older
+//        Engine ignores the third argument, so a package does not need to declare 1.68. No permission.
+export const supportedCapabilityApi = Object.freeze({ major: 1, minor: 68 } as const);
 
 const capabilityApiVersionSchema = z
   .object({

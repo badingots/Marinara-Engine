@@ -595,7 +595,7 @@ assert.equal(
 );
 assert.match(
   characterRoutesSource,
-  /const sprites = await readSpritesForId\(char\.id, true\);[\s\S]*if \(!sprites\)[\s\S]*status\(413\)[\s\S]*buildCompatibleCharacterExport\(charData, sprites\)/u,
+  /const sprites = await readSpritesForId\(char\.id, true\);[\s\S]*if \(!sprites\)[\s\S]*status\(413\)[\s\S]*buildCompatibleCharacterExport\(charData, sprites, \{ keepOnboarding: true \}\)/u,
   "PNG export must reject sprite collections that cannot round-trip before building the card envelope",
 );
 assert.match(
@@ -2382,7 +2382,7 @@ try {
     lorebookId: professorMariLorebookId,
   });
   assert.equal(
-    (professorMariEntryIndex.output as Array<{ content: string }>)[0]?.content.endsWith("…"),
+    (professorMariEntryIndex.output as { items: Array<{ content: string }> }).items[0]?.content.endsWith("…"),
     true,
     "the lorebook entry index should remain compact",
   );
@@ -6288,10 +6288,13 @@ const gameJournalSource = readFileSync(
   new URL("../../packages/client/src/components/game/GameJournal.tsx", import.meta.url),
   "utf8",
 );
-const choiceSelectionModalSource = readFileSync(
-  new URL("../../packages/client/src/components/presets/ChoiceSelectionModal.tsx", import.meta.url),
-  "utf8",
-);
+// The modal renders each variable's options through the shared ChoiceOptionsField.
+const choiceSelectionModalSource =
+  readFileSync(
+    new URL("../../packages/client/src/components/presets/ChoiceSelectionModal.tsx", import.meta.url),
+    "utf8",
+  ) +
+  readFileSync(new URL("../../packages/client/src/components/presets/ChoiceOptionsField.tsx", import.meta.url), "utf8");
 const gameSurfaceSource = readFileSync(
   new URL("../../packages/client/src/components/game/GameSurface.tsx", import.meta.url),
   "utf8",

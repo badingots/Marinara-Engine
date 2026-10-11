@@ -368,7 +368,7 @@ export interface ChatMetadata {
   agentWriteApprovalRequired?: boolean;
   /** Per-agent enable overrides (agentId → boolean) */
   agentOverrides: Record<string, boolean>;
-  /** Agent IDs scoped to this chat. Non-empty = only these agents run; empty = use globally-enabled agents. */
+  /** Agent IDs that run in this chat. An empty list runs none. */
   activeAgentIds: string[];
   /** Per-chat selected named prompt template for each agent type. Missing/default = the agent's default prompt. */
   agentPromptTemplateIds?: Record<string, string>;
@@ -854,6 +854,8 @@ export interface MessageAttachment {
   name?: string;
   prompt?: string;
   galleryId?: string;
+  /** Character who sent a Conversation selfie; older selfies lack it. */
+  characterName?: string;
 }
 
 /** A reaction on a Conversation message: an emoji token + who reacted. */
